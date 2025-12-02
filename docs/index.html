@@ -1,0 +1,462 @@
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Continuous Perception Matters: Diagnosing Temporal Integration Failures in Multimodal Models</title>
+
+    <meta name="title" content="Continuous Perception Matters: Diagnosing Temporal Integration Failures in Multimodal Models">
+    <meta name="description" content="We introduce CP-Bench, a benchmark that exposes fundamental temporal integration failures in modern multimodal models, revealing limits in time-consistent visual reasoning.">
+    
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <meta name="robots" content="index, follow">
+    
+    <meta property="og:locale" content="en_US">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Continuous Perception Matters">
+    <meta property="og:description" content="CP-Bench exposes fundamental temporal integration failures in modern multimodal models, revealing limits in time-consistent visual reasoning.">
+    <meta property="og:url" content="https://your-website-url.com">
+    <meta property="og:site_name" content="CP-Bench">
+
+    <meta name="twitter:title" content="Continuous Perception Matters: Temporal Integration Failures in Multimodal Models">
+    <meta name="twitter:description" content="A clean benchmark revealing fundamental temporal integration failures in modern multimodal models.">
+
+    <link rel="stylesheet" type="text/css" media="all" href="assets/stylesheets/main_free.css" />
+    <link rel="stylesheet" type="text/css" media="all" href="clarity/clarity.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/styles/foundation.min.css">
+    <link href="assets/fontawesome-free-6.6.0-web/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/styles.css"/>
+    <script defer src="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/index.js"></script>
+    <script src="assets/scripts/navbar.js"></script> <!-- Comment to remove table of content. -->
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            "HTML-CSS": {
+              scale: 95,
+              fonts: ["Gyre-Pagella"],
+              imageFont: null,
+              undefinedFamily: "'Arial Unicode MS', cmbright"
+            },
+            tex2jax: {
+                inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+                processEscapes: true
+              }
+          });
+    </script>
+    <script type="text/javascript"
+    src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+
+<body>
+    <!-- Title Page -->
+    <!-- Dark Theme Example: Change the background colour dark and change the following div "blog-title" into "blog-title white". -->
+    <div class="container blog" id="first-content" style="background-color: #E0E4E6;">
+        <!-- If you don't have a project cover: Change "blog-title" into "blog-title no-cover"  -->
+        <div class="blog-title no-cover">
+            <div class="blog-intro">
+                <div>
+                    <h1 class="title">Continuous Perception Matters: Diagnosing Temporal Integration Failures in Multimodal Models</h1>
+                    <p class="author"> <br> <a>Zeyu Wang</a><sup>1</sup>, <a>Zhenzhen Weng</a><sup>2</sup>, <a>Serena Yeung-Levy</a><sup>1</sup></p>
+                    <p class="author"><sup>1</sup> Stanford University <br> <sup>2</sup> Waymo </p>
+
+                    <p class="abstract">
+                        Continuous perception, the ability to integrate visual observations over time in a continuous stream fashion, is essential for robust real-world understanding, yet remains largely untested in current multimodal models. We introduce CP-Bench, a minimal and fully controlled benchmark designed to isolate this capability using an extremely simple task: counting identical cubes in a synthetic scene while the camera moves and only reveals subsets of objects at any moment. Despite the simplicity of the setting, we find that state-of-the-art open-source and commercial models, including Qwen-3-VL, InternVL3, GPT-5, and Gemini-3-Pro, fail dramatically. A static-camera control variant confirms that the failure arises not from object recognition but from an inability to accumulate evidence across time. Further experiments show that neither higher sampling FPS, perception- or spatial-enhanced models, nor finetuning with additional videos leads to meaningful cross-temporal generalization. Our results reveal a fundamental limitation in modern multimodal architectures and training paradigms. CP-Bench provides a simple yet powerful diagnostic tool and establishes a clean testbed for developing models capable of genuine time-consistent visual reasoning.
+                    </p>
+                   
+                </div>
+               
+                <div class="info">
+                    <div>
+                        <br>
+                        <a href="https://arxiv.org/pdf/2408.07867v2" class="button icon" style="background-color: rgba(255, 255, 255, 0.25); margin-bottom: 0;">Paper <i class="fa-solid fa-file-pdf"></i></a>
+
+                        <a href="https://huggingface.co/datasets/ContinuousPerceptionResearch/CP-Bench" class="button icon" style="background-color: rgba(255, 255, 255, 0.25); margin-bottom: 0;">Data <i class="fa-solid fa-database"></i></a>
+
+                        <a href="" class="button icon" style="background-color: rgba(255, 255, 255, 0.25); margin-bottom: 0;">Code (Coming Soon) <i class="fa-solid fa-code"></i></a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- <div class="blog-cover">
+                <img class="foreground" src="assets/figures/clarity.png">
+                <img class="background" src="assets/figures/clarity.png">
+            </div> -->
+        </div>
+    </div>
+
+
+    <div class="container blog main first" id="blog-main">
+        <h1>
+            Introduction
+        </h1>
+        <p class='text'>
+            Human vision operates as a continuous perceptual process: we experience the world through an uninterrupted stream of visual input, gradually accumulating evidence, establishing correspondence over time, and forming holistic, persistent representations of dynamic scenes (top of Figure <a href="#fig-1">1</a>). This ability to integrate information across time is central to human visual intelligence, allowing us to track objects, reason about occlusions, and maintain stable scene understanding despite fragmentary views at any moment.
+        </p>
+
+        <p class="text">
+            In contrast, contemporary vision-language and multimodal models process videos in a fundamentally different manner. Most existing architectures treat a video as a collection of separated frames, extracting features independently and aggregating them with shallow temporal modules (bottom of Figure <a href="#fig-1">1</a>). As a consequence, these systems tend to rely on texture-based shortcuts and momentary visual cues, resulting in fragmented and superficial video understanding. Despite rapid progress in video benchmarks and large-scale multimodal training, it remains unclear whether current models can perform the kind of continuous, stream-based perception that humans naturally employ.
+        </p>
+
+        <img src="clarity/images/pull.png" style="width: 80%;" id="fig-1">
+        <p class="caption">
+            Figure 1: Human perception (top) operates on a continuous visual stream, which enables a holistic and deep understanding of spatio-temporal events. In contrast, dominant AI models (bottom) employ a separate frames paradigm, processing sparse, discrete snapshots. We argue this leads to a fragmented and superficial understanding that fundamentally fails to capture true spatio-temporal continuity.
+        </p>
+
+        <p class="text">
+            <!-- We argue that this capability has remained largely unexplored because existing video benchmarks rarely require continuous perception. Many benchmarks emphasize high-level semantics, action classification, or summarization, where success does not depend on integrating partial views over time. As a result, models can attain strong performance while entirely bypassing the deeper continuous temporal reasoning that characterizes human perception. -->
+
+            To reveal this blind spot, we introduce the Continuous Perception Benchmark (CP-Bench), a deliberately minimalistic yet diagnostic evaluation of a model’s ability to integrate visual information over time. 
+            
+            Each video consists of visually identical cubes placed on a plane, rendered with CLEVR-style physics and appearance, while a camera moves horizontally across the scene. At any moment, only a subset of cubes is visible, and the task is simply to count the total number of cubes. Because all cubes share identical shape, color, and texture, the task cannot be solved by single-frame appearance cues; instead, it inherently requires continuous perception for maintaining object permanence, aligning observations across frames, and constructing a global scene representation.
+        </p>
+
+        <p class="text">
+            Although CP-Bench is conceptually simple, our experiments reveal that it exposes a fundamental limitation of current multimodal systems. We evaluate a wide range of state-of-the-art open-source and proprietary models, and find that none can reliably solve the benchmark. These findings collectively suggest that current video-language architectures lack the mechanisms required for continuous, time-consistent perception. Our results point toward the need for new architectures and training paradigms explicitly designed to model continuous spatiotemporal processes. We hope that CP-Bench serves as a foundation for future research toward truly human-like video understanding.
+        </p>
+
+    </div>
+
+
+    <div class="container blog main">
+        <h1 >
+            Continuous Perception Benchmark (CP-Bench)
+        </h1>
+
+        <p class="text">
+            CP-Bench is built on the CLEVR dataset, using Blender to render synthetic scenes. Each scene consists of a static planar surface populated by a set number of cubes. All cubes share identical appearance, i.e are identical in shape, color, size, material, and texture. This is a critical design choice made to eliminate texture-based shortcuts and prevent recognition based on superficial visual cues. The virtual camera performs a single, smooth horizontal panning motion across the scene over a duration of 10 seconds. The camera's field of view is constrained, ensuring that only a subset of the total cubes is visible at any given moment. All rendering parameters other than cube positions are kept constant across scenes. The task is to answer the question: "How many cubes are present in the scene?". The benchmark includes five object-count configurations: 3, 4, 5, 6, and 7 cubes. We generated 20 unique instances for each count, resulting in a balanced diagnostic set of 100 total video instances.
+        </p>      
+        
+        <p class="text">
+             To further eliminate potential confounding factors and verify that model failures on CP-Bench are not attributable to low-level perceptual limitations, we design a control test set that preserves the exact visual appearance of the main benchmark while removing the need for continuous perception. In this control condition, the camera remains static, and all cubes are simultaneously visible in every frame. The control set contains the same five ground-truth object counts (3–7), with 20 instances per count, for a total of 100 test videos.
+        </p>
+
+    </div>
+    
+    <div class="container blog main gray">
+        <div class="columns-2">
+            <div>
+                 <video id="main-setting" src="clarity/videos/test_moving_video000065.mp4" autoplay controls muted loop></video>
+                 <p class="caption selection">
+                    <b>CP-Bench </b> 
+                 </p>
+            </div>
+
+            <div>
+                <video id="control-setting" src="clarity/videos/test_static_video000065.mp4" autoplay controls muted loop></video>
+                <p class="caption selection">
+                   <b>Control setting (note this is a video, not a still image) </b>
+                    
+                </p>
+           </div>
+        </div>
+    </div>
+
+    <div class="container blog main">
+        <h1 >
+            Experiment Results
+        </h1>
+
+        <h2 >
+            Main Results
+        </h2>
+
+        <p class="text">
+            We evaluate several state-of-the-art models on our benchmark, including the Qwen-VL and InternVL series for open-source models, as well as GPT and Gemini for proprietary models. Test videos are sampled at 1 fps. A summary of the results is provided in the table below.
+        </p>
+
+        <div class="table-wrapper">
+            <table>
+                <tr>
+                    <td>Model</td>
+                    <td style="text-align: center;">GT=3</td>
+                    <td style="text-align: center;">GT=4</td>
+                    <td style="text-align: center;">GT=5</td>
+                    <td style="text-align: center;">GT=6</td>
+                    <td style="text-align: center;">GT=7</td>
+                    <td style="text-align: center;">Overall</td>
+                    <td style="text-align: center;">Control</td>
+                    <td style="text-align: center;">$\Delta$</td>
+                </tr>
+                <tr>
+                    <td>InternVL2-8B</td>
+                    <td style="text-align: center;">30.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">6.0</td>
+                    <td style="text-align: center;">41.0</td>
+                    <td style="text-align: center;">$\downarrow$ 35.0</td>
+                </tr>
+                <tr>
+                    <td>InternVL2.5-8B</td>
+                    <td style="text-align: center;">25.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">5.0</td>
+                    <td style="text-align: center;">58.0</td>
+                    <td style="text-align: center;">$\downarrow$ 53.0</td>
+                </tr>
+                <tr>
+                    <td>InternVL3-8B</td>
+                    <td style="text-align: center;">30.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">6.0</td>
+                    <td style="text-align: center;">79.0</td>
+                    <td style="text-align: center;">$\downarrow$ 73.0</td>
+                </tr>
+                <tr>
+                    <td>Qwen2VL-7B</td>
+                    <td style="text-align: center;">30.0</td>
+                    <td style="text-align: center;">60.0</td>
+                    <td style="text-align: center;">65.0</td>
+                    <td style="text-align: center;">20.0</td>
+                    <td style="text-align: center;">15.0</td>
+                    <td style="text-align: center;">38.0</td>
+                    <td style="text-align: center;">58.0</td>
+                    <td style="text-align: center;">$\downarrow$ 20.0</td>
+                </tr>
+                <tr>
+                    <td>Qwen2.5VL-7B</td>
+                    <td style="text-align: center;">25.0</td>
+                    <td style="text-align: center;">80.0</td>
+                    <td style="text-align: center;">45.0</td>
+                    <td style="text-align: center;">35.0</td>
+                    <td style="text-align: center;">15.0</td>
+                    <td style="text-align: center;">40.0</td>
+                    <td style="text-align: center;">86.0</td>
+                    <td style="text-align: center;">$\downarrow$ 46.0</td>
+                </tr>
+                <tr>
+                    <td>Qwen3VL-8B</td>
+                    <td style="text-align: center;">35.0</td>
+                    <td style="text-align: center;">65.0</td>
+                    <td style="text-align: center;">20.0</td>
+                    <td style="text-align: center;">20.0</td>
+                    <td style="text-align: center;">10.0</td>
+                    <td style="text-align: center;">30.0</td>
+                    <td style="text-align: center;">82.0</td>
+                    <td style="text-align: center;">$\downarrow$ 52.0</td>
+                </tr>
+                <tr>
+                    <td>GPT-5-Mini</td>
+                    <td style="text-align: center;">60.0</td>
+                    <td style="text-align: center;">20.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">15.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">19.0</td>
+                    <td style="text-align: center;">99.0</td>
+                    <td style="text-align: center;">$\downarrow$ 80.0</td>
+                </tr>
+                <tr>
+                    <td>GPT-5</td>
+                    <td style="text-align: center;">25.0</td>
+                    <td style="text-align: center;">5.0</td>
+                    <td style="text-align: center;">0.0</td>
+                    <td style="text-align: center;">5.0</td>
+                    <td style="text-align: center;">5.0</td>
+                    <td style="text-align: center;">8.0</td>
+                    <td style="text-align: center;">97.0</td>
+                    <td style="text-align: center;">$\downarrow$ 89.0</td>
+                </tr>
+                <tr>
+                    <td>Gemini-2.5-Flash</td>
+                    <td style="text-align: center;">50.0</td>
+                    <td style="text-align: center;">15.0</td>
+                    <td style="text-align: center;">15.0</td>
+                    <td style="text-align: center;">15.0</td>
+                    <td style="text-align: center;">15.0</td>
+                    <td style="text-align: center;">22.0</td>
+                    <td style="text-align: center;">100.0</td>
+                    <td style="text-align: center;">$\downarrow$ 78.0</td>
+                </tr>
+                <tr>
+                    <td>Gemini-2.5-Pro</td>
+                    <td style="text-align: center;">40.0</td>
+                    <td style="text-align: center;">35.0</td>
+                    <td style="text-align: center;">25.0</td>
+                    <td style="text-align: center;">30.0</td>
+                    <td style="text-align: center;">15.0</td>
+                    <td style="text-align: center;">29.0</td>
+                    <td style="text-align: center;">100.0</td>
+                    <td style="text-align: center;">$\downarrow$ 71.0</td>
+                </tr>
+                <tr>
+                    <td>Gemini-3-Pro</td>
+                    <td style="text-align: center;">80.0</td>
+                    <td style="text-align: center;">55.0</td>
+                    <td style="text-align: center;">55.0</td>
+                    <td style="text-align: center;">40.0</td>
+                    <td style="text-align: center;">25.0</td>
+                    <td style="text-align: center;">51.0</td>
+                    <td style="text-align: center;">100.0</td>
+                    <td style="text-align: center;">$\downarrow$ 49.0</td>
+                </tr>
+            </table>
+        </div>
+
+        <p class="text">
+            None of the models are able to reliably infer the total number of cubes when continuous temporal integration is required. These results demonstrate that state-of-the-art multimodal systems, despite their impressive abilities on existing video benchmarks, lack the capacity for continuous perception. The dramatic accuracy drop compared to the control condition suggests that failure is not due to object recognition ability or difficulty in counting identical cubes. Rather, the models struggle to maintain object permanence, form temporally stable correspondences, and integrate sequential observations into a coherent global representation of the scene.
+        </p>
+
+        <h2 >
+            Does higher sampling FPS help?
+        </h2>
+        
+        <p class="text">
+            To examine whether denser temporal sampling improves performance, potentially enabling models to approximate continuous perception by observing more frames, we conduct an additional experiment varying the input frame rate from 1 to 5 fps.
+        </p>
+
+        <div class="table-wrapper">
+            <table>
+                <tr>
+                    <td>Model</td>
+                    <td style="text-align: center;">FPS-1</td>
+                    <td style="text-align: center;">FPS-2</td>
+                    <td style="text-align: center;">FPS-3</td>
+                    <td style="text-align: center;">FPS-4</td>
+                    <td style="text-align: center;">FPS-5</td>
+                </tr>
+                <tr>
+                    <td>InternVL2-8B</td>
+                    <td style="text-align: center;">6.0</td>
+                    <td style="text-align: center;">1.0</td>
+                    <td style="text-align: center;">1.0</td>
+                    <td style="text-align: center;">1.0</td>
+                    <td style="text-align: center;">1.0</td>
+                </tr>
+                <tr>
+                    <td>InternVL2.5-8B</td>
+                    <td style="text-align: center;">5.0</td>
+                    <td style="text-align: center;">5.0</td>
+                    <td style="text-align: center;">5.0</td>
+                    <td style="text-align: center;">5.0</td>
+                    <td style="text-align: center;">5.0</td>
+                </tr>
+                <tr>
+                    <td>InternVL3-8B</td>
+                    <td style="text-align: center;">6.0</td>
+                    <td style="text-align: center;">6.0</td>
+                    <td style="text-align: center;">8.0</td>
+                    <td style="text-align: center;">9.0</td>
+                    <td style="text-align: center;">9.0</td>
+                </tr>
+                <tr>
+                    <td>Qwen2VL-7B</td>
+                    <td style="text-align: center;">38.0</td>
+                    <td style="text-align: center;">41.0</td>
+                    <td style="text-align: center;">41.0</td>
+                    <td style="text-align: center;">34.0</td>
+                    <td style="text-align: center;">22.0</td>
+                </tr>
+                <tr>
+                    <td>Qwen2.5VL-7B</td>
+                    <td style="text-align: center;">40.0</td>
+                    <td style="text-align: center;">38.0</td>
+                    <td style="text-align: center;">23.0</td>
+                    <td style="text-align: center;">27.0</td>
+                    <td style="text-align: center;">33.0</td>
+                </tr>
+                <tr>
+                    <td>Qwen3VL-8B</td>
+                    <td style="text-align: center;">30.0</td>
+                    <td style="text-align: center;">12.0</td>
+                    <td style="text-align: center;">11.0</td>
+                    <td style="text-align: center;">7.0</td>
+                    <td style="text-align: center;">8.0</td>
+                </tr>
+            </table>
+        </div>
+
+        <p class="text">
+            Results show that increasing the frame rate does not meaningfully improve performance. This supports our central hypothesis: <b>contemporary video models do not perform continuous perception, and increasing input density alone cannot compensate for this architectural and algorithmic limitation.</b>
+        </p>
+
+
+        <h2>
+            Finetuning on Synthetic Training Data
+        </h2>
+
+        <p class="text">
+            To further probe whether current models can learn continuous perception when provided with supervised data, we generate a synthetic training set that mirrors the structure of CP-Bench. Using the same rendering pipeline, we create 1,000 training videos: 200 instances for each ground-truth count from 3 to 7. All scenes strictly avoid overlap with test-set configurations, ensuring a clean separation between training and evaluation. We then finetune Qwen2.5-VL-7B for 5 epochs.
+        </p>
+
+        <p class="text">
+            The finetuned model achieves 89% accuracy on the CP-Bench test set, which is significantly higher than the 40% accuracy of the original model. At first glance, this might suggest that the model has successfully acquired continuous perception capabilities. However, the extreme simplicity and uniformity of our setting raise the possibility that the model may have discovered shortcut strategies instead of learning to integrate information across time. 
+        </p>
+
+        <p class="text">
+            To distinguish true continuous perception from shortcut-based learning, we modify the training set by shortening video duration from 10 seconds to 5 seconds, effectively halving the camera’s traversal distance. The test set remains unchanged (10 seconds). If the model had learned a temporally generalizable perception strategy, then reducing training video length should not substantially impact test performance. However, under this setting, the finetuned model achieves only 20% accuracy on the 10-second test set, a drastic drop from the earlier 89%. We also perform the reverse experiment: training on 10-second videos and testing on 5-second videos. Again, the model achieves only 20% accuracy while training on 5-second achieves perfect accuracy.
+        </p>
+
+        <img src="clarity/images/generalization.png" style="width: 80%;" id="fig-2">
+
+        <p class="text">
+            This result reinforces our core thesis that current architectures and training paradigms fundamentally lack mechanisms for robust continuous perception. Notably, this train-test-generalization setup provides a simple testbed for distinguishing genuine continuous perception from superficial overfitting, facilitating development of models explicitly designed to maintain temporally cohesive representations. Ultimately, models that achieve true spatio-temporal reasoning should be capable of generalizing to arbitrarily long videos without performance degradation.
+        </p>
+
+    </div>
+
+    <div class="container blog main">
+        <h1>
+            Conclusion
+        </h1>
+
+        <p class="text">
+            In this work, we argue that the prevailing paradigm of processing video as a collection of discrete, sampled frames is a fundamental barrier to achieving human-like visual intelligence. This approach leads to a fragmented and superficial understanding, in stark contrast to the holistic, continuous perception employed by humans. To empirically demonstrate this gap, we introduced the Continuous Perception Benchmark (CP-Bench), a minimalist diagnostic task where models must count visually identical objects in a panning video. This simple setup effectively neutralizes the texture-based shortcut solutions that many contemporary benchmarks permit, isolating the core capability of spatio-temporal correspondence. Despite the benchmark’s extreme simplicity, our experiments reveal that modern state-of-the-art multimodal models consistently fail on this trivially simple task. 
+        </p>
+
+        <p class="text">
+            We hope that this work opens a new research direction toward models capable of genuinely continuous perception, i.e., systems that track persistent structure in the world, accumulate information over time, and reason about scenes the way humans do. Achieving this capability will likely require innovations in architecture, memory, temporal modeling, and training methodology. CP-Bench offers a stepping stone toward that goal, highlighting both the limitations of current approaches and the opportunities for progress in building physically grounded, temporally coherent multimodal intelligence.
+        </p>
+
+    </div>
+
+    <div class="container blog main gray">
+        <div class="columns-2">
+            <div>
+                 <video id="video" src="clarity/videos/test_moving_video000065.mp4" autoplay controls muted loop style="width: 100%;"></video>
+            </div>
+
+            <div>
+                <img id="frames" src="clarity/images/frames.png" style="width: 125%">
+           </div>
+        </div>
+
+        <p class="caption selection">
+            <b> Difference in perceiving video vs. individual frames. </b> The two modes of viewing lead to very different levels of understanding. Examining isolated frames requires constant back-and-forth comparison to establish correspondence, whereas watching a continuous video allows this correspondence to emerge naturally and effortlessly. <b><span style="color: rgb(213, 55, 55);">Current multimodal models process videos more like the disjointed frames on the right, rather than like humans who perceive the smooth, continuous stream on the left.</span></b>
+        </p>
+    </div>
+
+    <div class="container blog main">
+        <pre><code class="plaintext">@article{cpbench2025,
+  title={Continuous Perception Matters: Diagnosing Temporal Integration Failures in Multimodal Models},
+  author={Zeyu Wang and Zhenzhen Weng and Serena Yeung-Levy},
+  journal={arXiv preprint arXiv:2408.07867},
+  year={2025}
+}</code></pre>  
+    </div>
+    
+    <!-- Footer Page -->
+    <footer>
+        <div class="container">
+            <p>
+                This website is built on the template from <a href="https://shikun.io/projects/clarity">here</a>.
+            </p>
+        </div>    
+    </footer>
+    
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <script src="clarity/clarity.js"></script>    
+    <script src="assets/scripts/main.js"></script>    
+    </html>
+</body>
